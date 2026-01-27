@@ -1,3 +1,5 @@
 # Wrzeczak's Vector Language
 
-See `THEORY.txt` for practical specifications; writing languages has been something I've been trying my hand at since the 6th grade; was recently reminded of this and decided to try again.
+See `THEORY.md` for practical specifications; writing languages has been something I've been trying my hand at since the 6th grade; was recently reminded of this and decided to try again.
+
+The broad structure of the `wvcomp` program will be this: an input .wvlang (wreczak vector lang) file is given, and the file is split into valid tokens; some very basic error checking is done here (where easily misconstrued tokens, like `:=` being mistaken for `:==`, can be caught), but this is mostly for use-of-implementation of the next step (this process is achieved by `token_split_wv_file()`, the output of which is put into a scratch file). Then, proper lexing will occur on the temp file, followed by a parser, and then compilation down to an IR that `wvrun` can interpret. (direct compilation is probably beyond my skillset at this point). 
