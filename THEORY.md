@@ -30,6 +30,7 @@ Here's a list of the operators:
 |----------|------|-------------|
 | `=`      | ASSIGNMENT     | Assign a value to a name; names cannot be re-assigned to unless you call `EMPTY()` on them. |
 | `()`     | L/R-PAREN      | Used for grouping expressions. |
+| `[]`     | L/R-SQUARE | Used for delineating vectors. |
 | `==`     | EQUALITY       | Logical equal; `10 == 10`, `[10, 20, 30 ] == [ 10, 20, 30 ]`, etc. |
 | `:==`    | LEFT-EQUAL     | Check if the heads of two vectors are equal; returns the length of the equal vector e.g. `([ 10, 20, 30 ] :== 10 ) == 1`. Returns `0` if not equal. |
 | `==:`    | RIGHT-EQUAL    | As above, but with the rear; `([ 10, 20, 30 ] ==: [ 28, 29, 30 ]) == 1` |
