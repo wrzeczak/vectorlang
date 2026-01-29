@@ -13,6 +13,8 @@
 // also gotos to the messages_h error goto hehe
 static void lexer_error(unsigned int line_number, int char_number, const char * function, int fn_line_number, const char * message, char * line);
 
+//----------------------------
+
 // Tokenizes the input_file and outputs the tokens (more specifically, the lexemes), separated by newlines, into scratch_file 
 //
 // An example program:
@@ -30,7 +32,7 @@ static void lexer_error(unsigned int line_number, int char_number, const char * 
 // vec1
 // ...
 // returns the number of lexemes + newlines parsed
-int token_split_wv_file(FILE * input_file, FILE * scratch_file);
+void token_split_wv_file(FILE * input_file, FILE * scratch_file);
 
 static bool is_lower_alphabetical(char c);      // a .. z
 static bool is_upper_alphabetical(char c);      // A .. Z
@@ -41,6 +43,44 @@ static bool is_valid_nonstarting_name_char(char c);
 
 static bool is_equality_operator_char(char c);  // =, :
 static bool is_xpend_operator_char(char c);     // <, >, -
+
+//----------------------------
+
+typedef enum {
+    TOK_NUMBER = -3, // types that use the .value field are negative
+    TOK_NAME,
+    TOK_MACRO,       // == -1
+    TOK_LPAREN = 1,  // types that are simply do not
+    TOK_RPAREN,
+    TOK_LSQUARE,
+    TOK_RSQUARE,
+    TOK_COMMA,
+    TOK_RANGE,
+    TOK_LAPPEND,
+    TOK_RAPPEND,
+    TOK_ASSIGN,
+    TOK_EQUALS,
+    TOK_LEQUALS,
+    TOK_REQUALS,
+    TOK_CEQUALS,
+    TOK_ADD,
+    TOK_SUBTRACT,
+} TokenType;
+
+typedef struct {
+    unsigned int line;
+    TokenType type;
+    char * value;
+    unsigned int value_len;
+} LexerToken;
+
+struct build_tokens_ret_t {
+    LexerToken * tokens;
+    unsigned int num_tokens_parsed;
+    unsigned int num_lines;
+};
+
+struct build_tokens_ret_t build_tokens(FILE * scratch_fp);
 
 //------------------------------------------------------------------------------
 
@@ -53,7 +93,7 @@ static void lexer_error(unsigned int line_number, int char_number, const char * 
     exit(80085);
 }
 
-int token_split_wv_file(FILE * input_file, FILE * scratch_file) {
+void token_split_wv_file(FILE * input_file, FILE * scratch_file) {
     // set up a line buffer
     char line_buffer[1024];
     memset(line_buffer, 0, 1024);
@@ -198,11 +238,12 @@ int token_split_wv_file(FILE * input_file, FILE * scratch_file) {
 
             // build append/prepend/subtract operators: <-, ->, -
             if(is_xpend_operator_char(rc)) {
-                if(!is_xpend_operator_char(line_buffer[i + 1])) {
+                if(!is_xpend_operator_char(line_buffer[i + 1]) && !((line_buffer[i + 1] >= '0') && (line_buffer[i + 1] <= '9'))) {
                     // subtract
+                    dprintf("I promise this is not a negative number; line_buffer[i + 1] = %c!", line_buffer[i + 1]);
                     dprint("subtract");
                     fprintf(scratch_file, "-\n");
-                    // continue;
+                    continue;
                 } else if(strncmp(line_buffer + (unsigned char) i, "->", 2) == 0) {
                     dprint("prepend");
                     fprintf(scratch_file, "->\n");
@@ -213,7 +254,7 @@ int token_split_wv_file(FILE * input_file, FILE * scratch_file) {
                     fprintf(scratch_file, "<-\n");
                     i++;
                     continue;
-                } else {
+                } else if(!((line_buffer[i + 1] >= '0') && (line_buffer[i + 1] <= '9'))) { // this in case of negative numbers
                     dprintf("xpend sign found without correct operator matching: line %d, col %d", line_number, i + 1);
                     lexer_error(line_number, i + 1, "token_split_wv_file", __LINE__, "An invalid append/prepend-like operator was found (probably --)!", line_buffer);
                 }
@@ -273,8 +314,6 @@ int token_split_wv_file(FILE * input_file, FILE * scratch_file) {
         int new_scratch_file_pos = ftell(scratch_file);
         if(new_scratch_file_pos > scratch_file_pos) fprintf(scratch_file, "__NEWLINE\n");
     }
-
-    return -1;
 }
 
 static inline bool is_lower_alphabetical(char c) {
@@ -303,4 +342,97 @@ static bool is_equality_operator_char(char c) {
 
 static bool is_xpend_operator_char(char c) {
     return (c == '-') || (c == '<') || (c == '>');
+}
+
+struct build_tokens_ret_t build_tokens(FILE * scratch_fp) {
+    unsigned int line_number = 1;
+    char line_buffer[256];
+    memset(line_buffer, 0, 256);
+
+    unsigned int num_tokens_parsed = 0;
+    LexerToken * tokens = malloc(num_tokens_parsed * sizeof(LexerToken));
+
+    while(fgets(line_buffer, 256, scratch_fp)) {
+        if(strncmp(line_buffer, "__NEWLINE\n", strlen("__NEWLINE\n")) == 0) {
+            // dprintf("Newline found; this makes line number %d", line_number + 1);
+            line_number++;
+            continue;
+        }
+
+        // simple operator matching
+        TokenType simple_match = 0;
+
+        #define SMT(str, tok_t) else if(strncmp(line_buffer, str, strlen(str)) == 0) simple_match = tok_t
+
+        if(strncmp(line_buffer, "(", strlen("(")) == 0) simple_match = TOK_LPAREN;
+        SMT(")", TOK_RPAREN);
+        SMT("[", TOK_LSQUARE);
+        SMT("]", TOK_RSQUARE);
+        SMT(",", TOK_COMMA);
+        SMT("..", TOK_RANGE);
+        SMT("->", TOK_LAPPEND);
+        SMT("<-", TOK_RAPPEND);
+        SMT("=", TOK_ASSIGN);
+        SMT("==", TOK_EQUALS);
+        SMT(":==", TOK_LEQUALS);
+        SMT("==:", TOK_REQUALS);
+        SMT(":=:", TOK_CEQUALS);
+        SMT("+", TOK_ADD);
+        // SMT("-", TOK_SUBTRACT);
+        else if(strncmp(line_buffer, "-", strlen("-")) == 0 && !((line_buffer[1] >= '0') && (line_buffer[1] <= '9'))) {
+            dprintf("I promise this is not a negative number: line_buffer[1] is %c!", line_buffer[1]);
+            simple_match = TOK_SUBTRACT;
+        }
+
+        #undef SMT
+
+        if(simple_match != 0) {
+            LexerToken tok = (LexerToken) { .line = line_number, .type = simple_match, .value = NULL, .value_len = 0 };
+            num_tokens_parsed++;
+            tokens = realloc(tokens, num_tokens_parsed * sizeof(LexerToken));
+            tokens[num_tokens_parsed - 1] = tok;
+            dprintf("Token no. %d is %s.", num_tokens_parsed, line_buffer);
+        } else {
+            // otherwise, it's either a name, a macro, or a vector
+            TokenType complex_type = 0;
+            if(is_lower_alphabetical(line_buffer[0])) {
+                complex_type = TOK_NAME;
+            } else if(is_upper_alphabetical(line_buffer[0])) {
+                complex_type = TOK_MACRO;
+            } else if(is_numeric(line_buffer[0])) {
+                complex_type = TOK_NUMBER;
+            }
+
+            char * value = malloc(strlen(line_buffer)); // intentionally dropping the +1...
+            memset(value, 0, strlen(line_buffer));
+            strncpy(value, line_buffer, strlen(line_buffer) - 1); // to chop off the \n character
+
+            LexerToken tok = (LexerToken) { .line = line_number, .type = complex_type, .value = value, .value_len = strlen(value) };
+            num_tokens_parsed++;
+            tokens = realloc(tokens, num_tokens_parsed * sizeof(LexerToken));
+            tokens[num_tokens_parsed - 1] = tok;
+
+            if(complex_type == TOK_MACRO) dprintf("Token no. %d is (macro) %s.", num_tokens_parsed, value);
+            if(complex_type == TOK_NAME) dprintf("Token no. %d is (name) %s.", num_tokens_parsed, value);
+            else dprintf("Token no. %d is (number) %s.", num_tokens_parsed, value);
+            
+            if(complex_type == 0) {
+                lexer_error(line_number, 0, "build_tokens", __LINE__, "Found a token that did not match any of the types defined in the TokenType enum (probably an error in token_split_wv_file()?)!", line_buffer);
+            }
+        }
+    }
+
+    return (struct build_tokens_ret_t) { .num_tokens_parsed = num_tokens_parsed, .tokens = tokens, .num_lines = line_number - 1 };
+}
+
+// complex types malloc() their value; these need to be freed
+void destroy_tokens(LexerToken * tokens, unsigned int token_count) {
+    for(unsigned int i = 0; i < token_count; i++) {
+        LexerToken tok = tokens[i];
+
+        if(tok.type < 0) {
+            free(tok.value);
+        }
+    }
+    free(tokens);
 }

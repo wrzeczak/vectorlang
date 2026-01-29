@@ -99,3 +99,27 @@ Some extra notes:
 1) Spaces are not semantically important and are descarded before tokenization. I like to use a lot of space to keep things uncluttered, but it's purely stylistic. "vec<-10" is equivalent to "vec <- 10" is equivalent to "vec    <-                 10", etc.
 2) For reasons of implementation details of the lexer (specifically, token_split_wv_file()), the name "__NEWLINE" is forbidden. I hope this doesn't break anyone's hearts.
 3) For similar reasons, variables cannot begin with a capital letter (or numbers, but that's standard); this is because the builtin macros do. I don't think I've ever begun a *variable* name with a capital letter in my life, so I hope this is not so bad.
+
+--------------------------
+
+On Vectors:
+
+Vectors are arbitrary-dimensioned lists of integers (long long). A list of integers is simple to implement, and a 2d, 3d, etc. are as well; but an arbitrary-dimensioned list is not trivial, because in C you can't really "create" those sorts of types on the fly. So, one option was code generation; we determine the dimension of the list, then generate some code that creates a struct, some functions, etc. This I deemed too complex for this project. We could just lie about the arbitrary dimension, and just create manually like 1-10d int list structs, but this is uninteresting and tedious. So, I need to create a way to represent arbitrary-dimension lists in, ideally, a single list. This is my solution.
+
+First, for clarity; an n-dimensional vector is one which contains at least one member which requires n accessors to reach. In C-style syntax: 1d is `vec[x]`, 2d is `vec[x][y]`, etc. For now, I will only imagine perfect, geometric n-dimensional lists: a square list of "size" four looks like four vectors of four members: `[[(4)], [(4)], [(4)], [(4)]]`.
+
+Now, imagine a simple 2d vector `[[ 10, 20, 30 ], [ 100, 200, 300 ], [ 1000, 2000, 3000 ]]`; this can be easily boiled-down to:
+```
+{ .size = 3, .dim = 2, .vals = [ 10, 20, 30, 100, 200, 300, 1000, 2000, 3000 ] }
+```
+Generalizing, we come to a structure that looks like:
+```
+{ .dim = 2, .sizes = [ 3, 3, 3 ], .vals = [ 10, 20, 30, 100, 200, 300, 1000, 2000, 3000 ] }
+``` 
+So, imagining a new vector that looks like this:
+```
+[[ 10, 20 ], [ 30, 100, 200, 300 ], [ 1000, 2000 ], 3000 ]
+=> { .dim = 2, .sizes = [ 2, 4, 2, 1 ], .vals = ... }
+
+[[[abc], [abc], [abc]], [[abc], [abc], [abc]], [[abc], [abc], [abc]]]
+```

@@ -8,6 +8,7 @@
 #include "messages.h"
 
 #include "tokenizer.h"
+#include "parser.h"
 
 //------------------------------------------------------------------------------
 
@@ -32,7 +33,14 @@ int main(int argc, char ** argv) {
     // this scratch file will be used for tokenization
     FILE * scratch_fp = fopen(".wvcomp_temp", "w"); // this file is remove() at the end of the program
 
-    int num_lexemes = token_split_wv_file(input_fp, scratch_fp);
+    token_split_wv_file(input_fp, scratch_fp);
+    fclose(scratch_fp);
+    scratch_fp = fopen(".wvcomp_temp", "r");
+
+    struct build_tokens_ret_t lexer_tokens = build_tokens(scratch_fp);
+    dprintf("Read %d tokens.", lexer_tokens.num_tokens_parsed);
+
+    parse_lexer_tokens(lexer_tokens.tokens, lexer_tokens.num_tokens_parsed, lexer_tokens.num_lines);
 
     // EXITING and ERROR HANDLING if necessary
     //------------------------------------------------------------------------------
@@ -47,6 +55,8 @@ int main(int argc, char ** argv) {
 
     fclose(scratch_fp);
     // remove(".wvcomp_temp");
+
+    destroy_tokens(lexer_tokens.tokens, lexer_tokens.num_tokens_parsed);
 
     if(messages_h_goto_exit) exit(MESSAGES_H_ERRORCODE);
 
