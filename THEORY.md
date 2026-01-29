@@ -116,10 +116,9 @@ Generalizing, we come to a structure that looks like:
 ```
 { .dim = 2, .sizes = [ 3, 3, 3 ], .vals = [ 10, 20, 30, 100, 200, 300, 1000, 2000, 3000 ] }
 ``` 
-So, imagining a new vector that looks like this:
+Which means we can now abandon our square restriction.
 ```
 [[ 10, 20 ], [ 30, 100, 200, 300 ], [ 1000, 2000 ], 3000 ]
 => { .dim = 2, .sizes = [ 2, 4, 2, 1 ], .vals = ... }
-
-[[[abc], [abc], [abc]], [[abc], [abc], [abc]], [[abc], [abc], [abc]]]
 ```
+What needs to come next is, for dimensions higher than two, a recursive type structure. A 3d vector has a 2d sizes vector, which itself has a 1d sizes list (which is representable natively in C). This I do not have a clear solution for yet (1/29/26).
